@@ -1,5 +1,6 @@
 # Detecção de hemiplegia por meio da análise de imagens.
 Universidade Regional de Blumenau (FURB)
+
 Nomes: Guilherme W. Back e Arthur...
 
 ## Definições incias:
