@@ -1,7 +1,7 @@
 # Detecção de hemiplegia por meio da análise de imagens.
 Universidade Regional de Blumenau (FURB)
 
-Nomes: Guilherme W. Back e Arthur...
+Nomes: Guilherme W. Back e Arthur Utpadel
 
 ## Definições incias:
 - Neste trabalho está sendo considerado apenas o caso mais comum de hemiplegia que resulta na perca motora de apenas um lado do corpo.
@@ -13,8 +13,9 @@ Nomes: Guilherme W. Back e Arthur...
 - Angulações de análise: apenas costas e frente?
 
 ## Arquitetura:
-- https://github.com/open-mmlab/mmpose (YOLOX-Pose)
- 
+- Extração de pose de imagens com OpenPose/MediaPipe/MMPose.
+- Calcular de alguma forma a diferença de angulação das pernas ao andar.
+- Treinar um classificador (SVC), para classificar a diferença de angulos entre pessoas saudáveis e não saudáveis. 
 
 ## Origem dos vídeos/imagens: (TODO: Pedir permissão e acesso aos datasets)
 - https://youtu.be/-_UPziArPV0
