@@ -1,11 +1,14 @@
 import sys
 from pathlib import Path
+
 import joblib
 import numpy as np
+
 from gait_utils import FastGaitAnalyzer, extract_features_from_stats
 
 if __name__ == "__main__":
     VIDEO_PATH = "./dataset/test/hemiplegic/gaitfront.mp4"
+    # VIDEO_PATH = "./dataset/test/healthy/F01.mp4"
 
     MODEL_PATH = "./model/pose_landmarker.task"
     SAVE_DIR = Path("./saved_models")
