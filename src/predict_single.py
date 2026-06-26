@@ -5,7 +5,7 @@ import numpy as np
 from gait_utils import FastGaitAnalyzer, extract_features_from_stats
 
 if __name__ == "__main__":
-    VIDEO_PATH = "./dataset/test/hemiplegic/gait06.mp4"
+    VIDEO_PATH = "./dataset/test/hemiplegic/gaitfront.mp4"
 
     MODEL_PATH = "./model/pose_landmarker.task"
     SAVE_DIR = Path("./saved_models")
@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     print(f"Analyzing video: {video_file.name} ...")
     with FastGaitAnalyzer(MODEL_PATH, resize_scale=50, min_visibility=0.6) as analyzer:
-        stats = analyzer.analyze_video(video_file, verbose=True)
+        stats = analyzer.analyze_video(video_file, verbose=True, show_video=True)
         features = extract_features_from_stats(stats)
 
     print("\n" + "=" * 50)

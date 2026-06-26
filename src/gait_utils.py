@@ -16,6 +16,96 @@ def calculate_joint_angle(p1, p2, p3):
     return np.degrees(np.arccos(cos_angle))
 
 
+# Skeleton connections for lower body drawing
+POSE_CONNECTIONS = [
+    (23, 24),  # hips
+    (23, 25),
+    (24, 26),  # hip → knee
+    (25, 27),
+    (26, 28),  # knee → ankle
+    (27, 31),
+    (28, 32),  # ankle → foot index
+]
+
+
+def draw_landmarks_and_angles(
+    frame,
+    pose_landmarks,
+    left_knee_angle,
+    right_knee_angle,
+    left_foot_angle,
+    right_foot_angle,
+    width,
+    height,
+):
+    """Draw pose skeleton and annotate knee/foot angles on the frame."""
+    if pose_landmarks is None:
+        return frame
+
+    # Pixel coordinates for each landmark index
+    points = {}
+    for idx, lm in enumerate(pose_landmarks):
+        px = int(lm.x * width)
+        py = int(lm.y * height)
+        points[idx] = (px, py)
+        cv2.circle(frame, (px, py), 3, (0, 255, 0), -1)
+
+    # Draw connections
+    for start, end in POSE_CONNECTIONS:
+        if start in points and end in points:
+            cv2.line(frame, points[start], points[end], (0, 255, 255), 2)
+
+    # Annotate angles
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    color = (255, 0, 0)  # blue
+    if 25 in points:
+        cv2.putText(
+            frame,
+            f"LK:{left_knee_angle:.1f}",
+            (points[25][0] + 10, points[25][1] - 10),
+            font,
+            0.5,
+            color,
+            1,
+            cv2.LINE_AA,
+        )
+    if 26 in points:
+        cv2.putText(
+            frame,
+            f"RK:{right_knee_angle:.1f}",
+            (points[26][0] + 10, points[26][1] - 10),
+            font,
+            0.5,
+            color,
+            1,
+            cv2.LINE_AA,
+        )
+    if 27 in points:
+        cv2.putText(
+            frame,
+            f"LF:{left_foot_angle:.1f}",
+            (points[27][0] + 10, points[27][1] + 20),
+            font,
+            0.5,
+            color,
+            1,
+            cv2.LINE_AA,
+        )
+    if 28 in points:
+        cv2.putText(
+            frame,
+            f"RF:{right_foot_angle:.1f}",
+            (points[28][0] + 10, points[28][1] + 20),
+            font,
+            0.5,
+            color,
+            1,
+            cv2.LINE_AA,
+        )
+
+    return frame
+
+
 class GaitAnalyzer:
     def __init__(self, min_visibility=0.5):
         self.min_visibility = min_visibility
@@ -26,10 +116,10 @@ class GaitAnalyzer:
 
     def analyze_gait_cycle(self, world_landmarks, timestamp_ms, verbose=True):
         if world_landmarks is None:
-            return False
+            return None
         indices = [23, 25, 27, 31, 24, 26, 28, 32]
         if any(world_landmarks[i].visibility <= self.min_visibility for i in indices):
-            return False
+            return None
 
         left_hip, left_knee, left_ankle, left_foot = [
             world_landmarks[i] for i in indices[:4]
@@ -38,22 +128,19 @@ class GaitAnalyzer:
             world_landmarks[i] for i in indices[4:]
         ]
 
-        self.left_knee_history.append(
-            calculate_joint_angle(left_hip, left_knee, left_ankle)
-        )
-        self.right_knee_history.append(
-            calculate_joint_angle(right_hip, right_knee, right_ankle)
-        )
-        self.left_foot_history.append(
-            calculate_joint_angle(left_knee, left_ankle, left_foot)
-        )
-        self.right_foot_history.append(
-            calculate_joint_angle(right_knee, right_ankle, right_foot)
-        )
+        left_knee_angle = calculate_joint_angle(left_hip, left_knee, left_ankle)
+        right_knee_angle = calculate_joint_angle(right_hip, right_knee, right_ankle)
+        left_foot_angle = calculate_joint_angle(left_knee, left_ankle, left_foot)
+        right_foot_angle = calculate_joint_angle(right_knee, right_ankle, right_foot)
+
+        self.left_knee_history.append(left_knee_angle)
+        self.right_knee_history.append(right_knee_angle)
+        self.left_foot_history.append(left_foot_angle)
+        self.right_foot_history.append(right_foot_angle)
 
         if verbose:
             print(f"[{timestamp_ms}ms] Processing frame angles...", end="\r")
-        return True
+        return left_knee_angle, right_knee_angle, left_foot_angle, right_foot_angle
 
     def get_summary_statistics(self):
         if not self.left_knee_history or not self.left_foot_history:
@@ -118,7 +205,7 @@ class FastGaitAnalyzer:
             frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_LINEAR)
         return frame
 
-    def analyze_video(self, video_path, verbose=True):
+    def analyze_video(self, video_path, verbose=True, show_video=False):
         cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened():
             return None
@@ -134,6 +221,8 @@ class FastGaitAnalyzer:
                 break
             frame_counter += 1
             frame = self.preprocess_frame(frame)
+            h, w = frame.shape[:2]
+
             local_time_ms = int((frame_counter - 1) * 1000 / fps) if fps > 0 else 0
             absolute_timestamp_ms = self.global_timestamp_offset_ms + local_time_ms
             last_frame_timestamp_ms = local_time_ms
@@ -143,14 +232,33 @@ class FastGaitAnalyzer:
                 mp_image, absolute_timestamp_ms
             )
 
+            left_k, right_k, left_f, right_f = 0.0, 0.0, 0.0, 0.0
+
             if detection_result.pose_world_landmarks:
-                analyzer.analyze_gait_cycle(
+                angles = analyzer.analyze_gait_cycle(
                     detection_result.pose_world_landmarks[0],
                     absolute_timestamp_ms,
                     verbose=verbose,
                 )
+                if angles is not None:
+                    left_k, right_k, left_f, right_f = angles
+
+            if show_video:
+                pose_lms = (
+                    detection_result.pose_landmarks[0]
+                    if detection_result.pose_landmarks
+                    else None
+                )
+                frame = draw_landmarks_and_angles(
+                    frame, pose_lms, left_k, right_k, left_f, right_f, w, h
+                )
+                cv2.imshow("Gait Analysis - press 'q' to quit", frame)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    show_video = False
+                    cv2.destroyWindow("Gait Analysis - press 'q' to quit")
 
         cap.release()
+        cv2.destroyAllWindows()
         self.global_timestamp_offset_ms += last_frame_timestamp_ms + 1
         return analyzer.get_summary_statistics()
 
